@@ -1,0 +1,14 @@
+{
+  "jobs": [],
+  "vales": [],
+  "gastos": [],
+  "cortes": [],
+  "cortesDiarios": [],
+  "cajaBases": {},
+  "cajaSesion": {
+    "status": "closed",
+    "closedAt": "2026-11-15T20:17:56.467Z",
+    "dateKey": "2026-11-15",
+    "baseAmount": 0
+  }
+}

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { KeyRound, Lock, X } from 'lucide-react';
 import { isValidAdminPassword } from '../utils/security';
 
@@ -12,6 +13,26 @@ export default function SecurityPinModal({
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') {
+        setPassword('');
+        setError('');
+        onClose();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -46,17 +67,25 @@ export default function SecurityPinModal({
     onClose();
   }
 
-  return (
+  const modalNode = (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="security-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overscroll-contain overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleClose();
+      }}
     >
-      <div className="w-full max-w-sm rounded-3xl border border-[#565449] bg-[#1A1B15] p-5 shadow-2xl sm:p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[#D8CFBC]">
-            <Lock className="h-5 w-5" aria-hidden="true" />
+      <div
+        className="relative my-auto w-full max-w-sm rounded-3xl border border-[#2B2921] bg-[#161511] p-5 shadow-2xl sm:p-6 transition-all"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2.5 text-[#E4C59E]">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#E4C59E]/10 border border-[#E4C59E]/20">
+              <Lock className="h-4 w-4" aria-hidden="true" />
+            </div>
             <h3 id="security-modal-title" className="text-base font-extrabold text-[#FFFBF4]">
               {title}
             </h3>
@@ -65,13 +94,13 @@ export default function SecurityPinModal({
             type="button"
             aria-label="Cerrar ventana"
             onClick={handleClose}
-            className="rounded-xl border border-[#565449]/60 bg-[#11120D] p-2 text-[#D8CFBC] hover:text-[#FFFBF4]"
+            className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#26241D] bg-[#11100D] text-[#8E897C] hover:border-[#E4C59E]/40 hover:text-[#FFFBF4] transition"
           >
             <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
 
-        <p className="mb-4 text-xs text-[#9E9A8B]">{description}</p>
+        <p className="mb-4 text-xs leading-relaxed text-[#8E897C]">{description}</p>
 
         {error && (
           <div
@@ -86,14 +115,14 @@ export default function SecurityPinModal({
           <div>
             <label
               htmlFor="security-admin-password"
-              className="mb-1.5 block text-xs font-semibold text-[#D8CFBC]"
+              className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-[#A59F91]"
             >
               Contraseña de Administradora
             </label>
             <div className="relative flex items-center">
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute left-3.5 text-[#D8CFBC]"
+                className="pointer-events-none absolute left-3.5 text-[#7D786D]"
               >
                 <KeyRound className="h-4 w-4" />
               </span>
@@ -107,7 +136,7 @@ export default function SecurityPinModal({
                   setError('');
                 }}
                 placeholder="••••••••"
-                className="min-h-[44px] w-full rounded-xl border border-[#565449] bg-[#11120D] py-2.5 pl-10 pr-3 text-sm text-[#FFFBF4] focus:border-[#D8CFBC]"
+                className="min-h-[46px] w-full rounded-2xl border border-[#2B2921] bg-[#0E0E0A] py-2.5 pl-10 pr-3 text-sm text-[#FFFBF4] placeholder-[#565449] focus:border-[#E4C59E] focus:outline-none"
               />
             </div>
           </div>
@@ -116,14 +145,14 @@ export default function SecurityPinModal({
             <button
               type="button"
               onClick={handleClose}
-              className="min-h-[42px] rounded-xl border border-[#565449] bg-[#11120D] text-xs font-bold text-[#D8CFBC]"
+              className="min-h-[44px] rounded-2xl border border-[#26241D] bg-[#11100D] text-xs font-bold text-[#A59F91] hover:border-[#38362D] hover:text-[#FFFBF4] transition active:scale-95"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="min-h-[42px] rounded-xl bg-[#FFFBF4] text-xs font-extrabold text-[#11120D] hover:bg-[#D8CFBC] disabled:opacity-50"
+              className="min-h-[44px] rounded-2xl bg-[#FFFBF4] text-xs font-extrabold text-[#11100D] hover:bg-[#E5DFD3] transition active:scale-95 disabled:opacity-50"
             >
               {loading ? 'Verificando...' : 'Confirmar'}
             </button>
@@ -132,5 +161,6 @@ export default function SecurityPinModal({
       </div>
     </div>
   );
-}
 
+  return typeof document !== 'undefined' ? createPortal(modalNode, document.body) : modalNode;
+}

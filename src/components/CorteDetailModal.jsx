@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Banknote,
   Calendar,
@@ -25,11 +26,18 @@ export default function CorteDetailModal({
   onRequestDelete,
 }) {
   useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
     function handleKeyDown(e) {
       if (e.key === 'Escape') onClose();
     }
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [onClose]);
 
   if (!corte) return null;
@@ -50,7 +58,7 @@ export default function CorteDetailModal({
 
   function handleShareWhatsApp() {
     const lines = [
-      `*SALON LIZZY & SANDRA - ${corte.corteLabel || 'CORTE DE CAJA'}*`,
+      `*DINORA BEAUTY NAILS - ${corte.corteLabel || 'CORTE DE CAJA'}*`,
       `Fecha: ${formatDateKeyLabel(corte.dateKey)}`,
       `Horario: Apertura ${formatTime(corte.openedAt)} • Corte ${formatTime(corte.closedAt)}`,
       `Trabajos registrados: ${corte.jobCount}`,
@@ -90,18 +98,21 @@ export default function CorteDetailModal({
     openWhatsApp(lines.join('\n'));
   }
 
-  return (
+  const modalNode = (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="corte-detail-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overscroll-contain overflow-y-auto"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-[#565449] bg-[#1A1B15] p-5 shadow-2xl">
-        <div className="flex items-start justify-between gap-3 border-b border-[#565449]/60 pb-3">
+      <div
+        className="my-auto max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-[#2B2921] bg-[#161511] p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-[#26241D] pb-3">
           <div>
             <div className="flex items-center gap-2">
               <span className="rounded-lg bg-[#D8CFBC] px-2 py-0.5 text-xs font-extrabold text-[#11120D]">
@@ -274,5 +285,7 @@ export default function CorteDetailModal({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalNode, document.body) : modalNode;
 }
 

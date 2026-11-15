@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Scissors } from 'lucide-react';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { api } from './api';
+import logoImg from './assets/logo.jpg';
 import CortesView from './components/CortesView';
 import DailySummary from './components/DailySummary';
 import { DesktopNav, MobileNav } from './components/Navigation';
 import QuickRegister from './components/QuickRegister';
 import ValesView from './components/ValesView';
 
+const TAB_ORDER = ['register', 'daily', 'cortes', 'vales'];
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('register');
+  const [slideDirection, setSlideDirection] = useState('forward');
   const [state, setState] = useState({
     jobs: [],
     vales: [],
@@ -23,6 +27,25 @@ export default function App() {
   const [loadError, setLoadError] = useState('');
   const [toastMsg, setToastMsg] = useState('');
   const toastTimerRef = useRef(null);
+
+  const handleTabChange = useCallback((nextTab) => {
+    setActiveTab((curr) => {
+      if (curr === nextTab) return curr;
+      const currentIdx = TAB_ORDER.indexOf(curr);
+      const nextIdx = TAB_ORDER.indexOf(nextTab);
+      setSlideDirection(nextIdx >= currentIdx ? 'forward' : 'backward');
+      return nextTab;
+    });
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+  }, []);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+  }, [activeTab]);
 
   const showToast = useCallback((msg) => {
     setToastMsg(msg);
@@ -135,13 +158,26 @@ export default function App() {
   async function handleCreateCorteDiario(payload) {
     await api.createCorteDiario(payload);
     await fetchState();
-    showToast('Corte de caja manual guardado');
+    showToast('Corte de caja guardado');
+    handleTabChange('register');
   }
 
   async function handleDeleteCorteDiario(id, adminPassword) {
-    await api.deleteCorteDiario(id, adminPassword);
+    const res = await api.deleteCorteDiario(id, adminPassword);
+    if (!res?.cajaSesion || res.cajaSesion.status !== 'closed') {
+      await fetchState();
+      setLoadError(
+        'El servidor anterior sigue abierto en memoria. Cierra la ventana del servidor (Iniciar_Salon.bat o terminal) y vuélvela a abrir para aplicar la actualización.'
+      );
+      return;
+    }
+    setState((prev) => ({
+      ...prev,
+      cajaSesion: res.cajaSesion,
+    }));
     await fetchState();
-    showToast('Corte de caja eliminado');
+    showToast('Corte de caja eliminado y caja cerrada');
+    handleTabChange('register');
   }
 
   async function handleCloseCorte() {
@@ -158,6 +194,7 @@ export default function App() {
       }
       await fetchState();
       showToast('Caja lista para registrar');
+      handleTabChange('register');
     } catch (err) {
       await fetchState();
       throw err;
@@ -167,31 +204,36 @@ export default function App() {
   const hasCorteAlert = Boolean(state.quincena?.shouldAlert);
 
   return (
-    <div className="min-h-screen bg-[#11120D] pb-24 text-[#FFFBF4] sm:pb-10">
-      <header className="sticky top-0 z-30 border-b border-[#565449]/60 bg-[#11120D]/95 backdrop-blur-md">
+    <div className="min-h-screen bg-[#0D0D09] pb-24 text-[#FFFBF4] sm:pb-12 selection:bg-[#E4C59E]/30 selection:text-[#FFFBF4]">
+      <header className="sticky top-0 z-30 border-b border-[#26241D] bg-[#0D0D09]/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3.5">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#D8CFBC] text-[#11120D]">
-              <Scissors className="h-5 w-5" aria-hidden="true" />
+            <img
+              src={logoImg}
+              alt="Dinora Beauty Nails"
+              className="h-10 w-10 rounded-2xl object-cover border border-[#2B2921] shadow-sm"
+            />
+            <div>
+              <h1 className="text-base font-extrabold tracking-tight text-[#FFFBF4] sm:text-lg leading-tight">
+                Dinora Beauty Nails
+              </h1>
+              <p className="text-[11px] font-medium text-[#7D786D]">Control de caja y quincena</p>
             </div>
-            <h1 className="text-base font-extrabold tracking-tight text-[#FFFBF4] sm:text-lg">
-              Salón Lizzy &amp; Sandra
-            </h1>
           </div>
 
           <DesktopNav
             activeTab={activeTab}
-            onChange={setActiveTab}
+            onChange={handleTabChange}
             hasCorteAlert={hasCorteAlert}
           />
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 pt-5">
+      <main className="mx-auto max-w-3xl px-4 pt-5 overflow-x-hidden">
         {hasCorteAlert && activeTab !== 'cortes' && (
           <button
             type="button"
-            onClick={() => setActiveTab('cortes')}
+            onClick={() => handleTabChange('cortes')}
             className="mb-5 flex w-full items-center justify-between gap-3 rounded-2xl border border-amber-400/50 bg-amber-500/15 px-4 py-3.5 text-left transition hover:bg-amber-500/20"
           >
             <div className="flex items-center gap-3">
@@ -228,23 +270,18 @@ export default function App() {
             </button>
           </div>
         ) : (
-          <>
+          <div
+            key={activeTab}
+            className={
+              slideDirection === 'forward' ? 'animate-view-forward' : 'animate-view-backward'
+            }
+          >
             {activeTab === 'register' && (
               <QuickRegister
                 onSubmit={handleCreateJob}
                 cajaSesion={state.cajaSesion}
                 onAperturarCaja={handleAperturarCaja}
-                onNavigateToCaja={() => setActiveTab('daily')}
-              />
-            )}
-            {activeTab === 'vales' && (
-              <ValesView
-                vales={state.vales}
-                gastos={state.gastos}
-                onCreateVale={handleCreateVale}
-                onDeleteVale={handleDeleteVale}
-                onCreateGasto={handleCreateGasto}
-                onDeleteGasto={handleDeleteGasto}
+                onNavigateToCaja={() => handleTabChange('daily')}
               />
             )}
             {activeTab === 'daily' && (
@@ -273,7 +310,17 @@ export default function App() {
                 onCloseCorte={handleCloseCorte}
               />
             )}
-          </>
+            {activeTab === 'vales' && (
+              <ValesView
+                vales={state.vales}
+                gastos={state.gastos}
+                onCreateVale={handleCreateVale}
+                onDeleteVale={handleDeleteVale}
+                onCreateGasto={handleCreateGasto}
+                onDeleteGasto={handleDeleteGasto}
+              />
+            )}
+          </div>
         )}
       </main>
 
@@ -290,7 +337,7 @@ export default function App() {
 
       <MobileNav
         activeTab={activeTab}
-        onChange={setActiveTab}
+        onChange={handleTabChange}
         hasCorteAlert={hasCorteAlert}
       />
     </div>

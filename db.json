@@ -4,13 +4,11 @@
   "gastos": [],
   "cortes": [],
   "cortesDiarios": [],
-  "cajaBases": {
-    "2026-11-14": 500
-  },
+  "cajaBases": {},
   "cajaSesion": {
-    "status": "open",
-    "openedAt": "2026-11-14T21:11:57.375Z",
-    "baseAmount": 500,
-    "dateKey": "2026-11-14"
+    "status": "closed",
+    "closedAt": "2026-11-15T20:17:56.467Z",
+    "dateKey": "2026-11-15",
+    "baseAmount": 0
   }
 }

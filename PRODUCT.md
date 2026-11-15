@@ -28,7 +28,7 @@ A zero-dependency, offline-first local salon register built specifically for two
 ## Capabilities and Constraints
 
 - **Currency:** Honduran Lempiras (`Lps`).
-- **Revenue split:** Services assigned to Lizzy, Sandra, or both (`Ambas`, split 50/50 automatically).
+- **Revenue split:** Services assigned to Lizzy, Sandra, or both (`Ambas`, split 50/50 automatically). Salon expenses (`gastos`) are deducted directly from Sandra Viera's biweekly payout (`sandraTotal = sandraGross - sandraVales - gastosTotal`).
 - **Mandatory cash opening:** New services cannot be registered while the cash register is `closed`.
 - **Immutable opening float:** Once the opening cash amount is registered for a shift, it cannot be edited.
 - **Admin protection:** Editing or deleting jobs, `vales`, `gastos`, or saved cuts requires the admin password (`Admin911!`, verified via SHA-256 on both client and server).

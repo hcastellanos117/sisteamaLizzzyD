@@ -78,19 +78,19 @@ export const WORKERS = {
     id: 'lizzy',
     shortName: 'Solo Lizzy',
     fullName: 'Lizzy Dinora Viera',
-    badgeClass: 'bg-[#D8CFBC]/15 text-[#FFFBF4] border-[#D8CFBC]/35',
+    badgeClass: 'bg-[#E8B4B8]/15 text-[#E8B4B8] border-[#E8B4B8]/35',
   },
   sandra: {
     id: 'sandra',
     shortName: 'Solo Sandra',
     fullName: 'Sandra Viera',
-    badgeClass: 'bg-[#565449]/40 text-[#D8CFBC] border-[#565449]',
+    badgeClass: 'bg-[#A3C9A8]/15 text-[#A3C9A8] border-[#A3C9A8]/35',
   },
   both: {
     id: 'both',
     shortName: 'Compartido (Ambas)',
     fullName: 'Lizzy y Sandra (50% / 50%)',
-    badgeClass: 'bg-[#FFFBF4]/10 text-[#D8CFBC] border-[#D8CFBC]/40',
+    badgeClass: 'bg-[#E4C59E]/15 text-[#E4C59E] border-[#E4C59E]/35',
   },
 };
 

@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const app = express();
 const PORT = process.argv.includes('--dev') ? 3001 : (process.env.PORT || 3000);
 const DB_PATH = path.join(__dirname, '..', 'db.json');
+const LOGS_PATH = path.join(__dirname, '..', 'logs.json');
 const BACKUP_DIR = path.join(__dirname, '..', 'backups');
 const DIST_PATH = path.join(__dirname, '..', 'dist');
 
@@ -111,6 +112,65 @@ function writeDb(data) {
     createDailyBackup();
   });
   return writeQueue;
+}
+
+function ensureLogs() {
+  if (!fs.existsSync(LOGS_PATH)) {
+    try {
+      fs.writeFileSync(LOGS_PATH, '[]', 'utf8');
+    } catch (err) {
+      console.error('Error al inicializar logs.json:', err);
+    }
+  }
+}
+
+let logWriteQueue = Promise.resolve();
+
+function appendLog({ accion, modulo, descripcion, datos = null }) {
+  const now = new Date();
+  const fecha = getLocalDateKey(now);
+  const hora = now.toLocaleTimeString('es-HN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
+
+  const entry = {
+    id: `log_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+    fecha,
+    hora,
+    timestamp: now.toISOString(),
+    accion,
+    modulo,
+    descripcion,
+    datos,
+  };
+
+  logWriteQueue = logWriteQueue.then(() => {
+    try {
+      ensureLogs();
+      let logs = [];
+      try {
+        const raw = fs.readFileSync(LOGS_PATH, 'utf8');
+        logs = JSON.parse(raw);
+        if (!Array.isArray(logs)) logs = [];
+      } catch {
+        logs = [];
+      }
+      logs.unshift(entry);
+      if (logs.length > 5000) {
+        logs = logs.slice(0, 5000);
+      }
+      const tmpPath = `${LOGS_PATH}.tmp`;
+      fs.writeFileSync(tmpPath, JSON.stringify(logs, null, 2), 'utf8');
+      fs.renameSync(tmpPath, LOGS_PATH);
+    } catch (err) {
+      console.error('Error escribiendo en logs.json:', err);
+    }
+  });
+
+  return entry;
 }
 
 function calculateSplit(amount, worker) {
@@ -272,6 +332,12 @@ app.post('/api/jobs', async (req, res) => {
 
     db.jobs.unshift(newJob);
     await writeDb(db);
+    appendLog({
+      accion: 'REGISTRAR',
+      modulo: 'TRABAJO',
+      descripcion: `Se registró trabajo "${newJob.description}" por Lps. ${newJob.amount.toFixed(2)} (Colaboradora: ${newJob.worker}, Pago: ${newJob.paymentMethod}${newJob.clientReference ? `, Cliente: ${newJob.clientReference}` : ''})`,
+      datos: newJob,
+    });
     broadcastUpdate('job_added');
 
     res.status(201).json(newJob);
@@ -311,6 +377,7 @@ app.put('/api/jobs/:id', verifyAdminAuth, async (req, res) => {
       return res.status(400).json({ error: 'Método de pago inválido.' });
     }
 
+    const prevJob = { ...db.jobs[index] };
     const { lizzyAmount, sandraAmount } = calculateSplit(numericAmount, worker);
     db.jobs[index] = {
       ...db.jobs[index],
@@ -328,6 +395,16 @@ app.put('/api/jobs/:id', verifyAdminAuth, async (req, res) => {
     };
 
     await writeDb(db);
+    appendLog({
+      accion: 'EDITAR',
+      modulo: 'TRABAJO',
+      descripcion: `Se editó trabajo "${db.jobs[index].description}" (ID: ${id}). Monto: Lps. ${prevJob.amount.toFixed(2)} -> Lps. ${db.jobs[index].amount.toFixed(2)}`,
+      datos: {
+        id,
+        antes: prevJob,
+        despues: db.jobs[index],
+      },
+    });
     broadcastUpdate('job_updated');
 
     res.json(db.jobs[index]);
@@ -354,6 +431,12 @@ app.delete('/api/jobs/:id', verifyAdminAuth, async (req, res) => {
 
     db.jobs = db.jobs.filter((j) => j.id !== id);
     await writeDb(db);
+    appendLog({
+      accion: 'ELIMINAR',
+      modulo: 'TRABAJO',
+      descripcion: `Se eliminó trabajo "${job.description}" por Lps. ${job.amount.toFixed(2)} (Colaboradora: ${job.worker}, Pago: ${job.paymentMethod})`,
+      datos: job,
+    });
     broadcastUpdate('job_deleted');
 
     res.json({ ok: true });
@@ -393,6 +476,12 @@ app.post('/api/vales', async (req, res) => {
     const db = readDb();
     db.vales.unshift(newVale);
     await writeDb(db);
+    appendLog({
+      accion: 'REGISTRAR',
+      modulo: 'VALE',
+      descripcion: `Se registró vale para ${newVale.worker} por Lps. ${newVale.amount.toFixed(2)} (${newVale.paymentMethod}${newVale.note ? ` - Nota: ${newVale.note}` : ''})`,
+      datos: newVale,
+    });
     broadcastUpdate('vale_added');
 
     res.status(201).json(newVale);
@@ -419,6 +508,12 @@ app.delete('/api/vales/:id', verifyAdminAuth, async (req, res) => {
 
     db.vales = db.vales.filter((v) => v.id !== id);
     await writeDb(db);
+    appendLog({
+      accion: 'ELIMINAR',
+      modulo: 'VALE',
+      descripcion: `Se eliminó vale de ${vale.worker} por Lps. ${vale.amount.toFixed(2)}${vale.note ? ` (Nota: ${vale.note})` : ''}`,
+      datos: vale,
+    });
     broadcastUpdate('vale_deleted');
 
     res.json({ ok: true });
@@ -457,6 +552,12 @@ app.post('/api/gastos', async (req, res) => {
     const db = readDb();
     db.gastos.unshift(newGasto);
     await writeDb(db);
+    appendLog({
+      accion: 'REGISTRAR',
+      modulo: 'GASTO',
+      descripcion: `Se registró gasto del salón: "${newGasto.description}" por Lps. ${newGasto.amount.toFixed(2)} (${newGasto.paymentMethod})`,
+      datos: newGasto,
+    });
     broadcastUpdate('gasto_added');
 
     res.status(201).json(newGasto);
@@ -483,6 +584,12 @@ app.delete('/api/gastos/:id', verifyAdminAuth, async (req, res) => {
 
     db.gastos = db.gastos.filter((g) => g.id !== id);
     await writeDb(db);
+    appendLog({
+      accion: 'ELIMINAR',
+      modulo: 'GASTO',
+      descripcion: `Se eliminó gasto del salón: "${gasto.description}" por Lps. ${gasto.amount.toFixed(2)}`,
+      datos: gasto,
+    });
     broadcastUpdate('gasto_deleted');
 
     res.json({ ok: true });
@@ -585,13 +692,18 @@ app.post('/api/cortes-diarios', async (req, res) => {
     db.cajaSesion = {
       status: 'closed',
       closedAt: nuevoCorteCaja.closedAt,
-      lastCorteId: nuevoCorteCaja.id,
       dateKey: nuevoCorteCaja.dateKey,
       baseAmount: 0,
     };
 
     db.cortesDiarios.unshift(nuevoCorteCaja);
     await writeDb(db);
+    appendLog({
+      accion: 'REGISTRAR',
+      modulo: 'CORTE_DIARIO',
+      descripcion: `Corte de caja ${nuevoCorteCaja.corteLabel} realizado (${nuevoCorteCaja.dateKey}). Total servicios: Lps. ${nuevoCorteCaja.totalServicios.toFixed(2)}, Efectivo esperado: Lps. ${nuevoCorteCaja.efectivoEsperado.toFixed(2)}, Contado: Lps. ${nuevoCorteCaja.efectivoContado.toFixed(2)} (Diferencia: Lps. ${nuevoCorteCaja.diferencia.toFixed(2)}). Total trabajos: ${nuevoCorteCaja.jobCount}`,
+      datos: nuevoCorteCaja,
+    });
     broadcastUpdate('corte_diario_added');
 
     res.status(201).json(nuevoCorteCaja);
@@ -631,6 +743,12 @@ app.post('/api/caja/apertura', async (req, res) => {
     db.cajaBases[resolvedDateKey] = roundedBase;
 
     await writeDb(db);
+    appendLog({
+      accion: 'REGISTRAR',
+      modulo: 'APERTURA_CAJA',
+      descripcion: `Apertura de caja con base inicial de Lps. ${roundedBase.toFixed(2)} (Fecha: ${resolvedDateKey})`,
+      datos: { baseAmount: roundedBase, dateKey: resolvedDateKey, openedAt: db.cajaSesion.openedAt },
+    });
     broadcastUpdate('caja_opened');
 
     res.json({ ok: true, cajaSesion: db.cajaSesion });
@@ -644,25 +762,50 @@ app.delete('/api/cortes-diarios/:id', verifyAdminAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const db = readDb();
+    const targetCorte = db.cortesDiarios.find((c) => c.id === id);
+    const dateKey = targetCorte?.dateKey || db.cajaSesion?.dateKey || getLocalDateKey(new Date());
+
     db.cortesDiarios = db.cortesDiarios.filter((c) => c.id !== id);
 
-    // Restaurar a la caja activa los movimientos que estaban en este corte
-    db.jobs = db.jobs.map((j) => (j.corteDiarioId === id ? { ...j, corteDiarioId: null } : j));
-    db.vales = db.vales.map((v) => (v.corteDiarioId === id ? { ...v, corteDiarioId: null } : v));
-    db.gastos = db.gastos.map((g) => (g.corteDiarioId === id ? { ...g, corteDiarioId: null } : g));
+    // Al eliminar un corte de caja guardado, eliminar también los trabajos, vales y gastos
+    // comprendidos en ese corte para que no vuelvan a aparecer como caja activa en curso.
+    const jobIdsToDelete = new Set(targetCorte?.jobIds || []);
+    const valesIdsToDelete = new Set(targetCorte?.valesIds || []);
+    const gastosIdsToDelete = new Set(targetCorte?.gastosIds || []);
 
-    if (db.cajaSesion && db.cajaSesion.lastCorteId === id) {
-      db.cajaSesion = {
-        status: 'open',
-        openedAt: new Date().toISOString(),
-        baseAmount: Number(db.cajaBases[db.cajaSesion.dateKey]) || 0,
-        dateKey: db.cajaSesion.dateKey,
-      };
+    db.jobs = db.jobs.filter((j) => j.corteDiarioId !== id && !jobIdsToDelete.has(j.id));
+    db.vales = db.vales.filter((v) => v.corteDiarioId !== id && !valesIdsToDelete.has(v.id));
+    db.gastos = db.gastos.filter((g) => g.corteDiarioId !== id && !gastosIdsToDelete.has(g.id));
+
+    // Al eliminar un corte, la caja queda SIEMPRE cerrada y en cero.
+    // Ninguna caja activa debe permanecer abierta.
+    db.cajaSesion = {
+      status: 'closed',
+      closedAt: new Date().toISOString(),
+      dateKey,
+      baseAmount: 0,
+    };
+
+    delete db.cajaBases[dateKey];
+    if (db.cortesDiarios.length === 0) {
+      db.cajaBases = {};
     }
 
     await writeDb(db);
+    appendLog({
+      accion: 'ELIMINAR',
+      modulo: 'CORTE_DIARIO',
+      descripcion: `Se eliminó corte de caja ${targetCorte?.corteLabel || id} del día ${dateKey}. Se eliminaron ${jobIdsToDelete.size} trabajos, ${valesIdsToDelete.size} vales y ${gastosIdsToDelete.size} gastos vinculados. Caja reiniciada a cerrada en cero.`,
+      datos: {
+        id,
+        corteEliminado: targetCorte,
+        jobIdsEliminados: Array.from(jobIdsToDelete),
+        valesIdsEliminados: Array.from(valesIdsToDelete),
+        gastosIdsEliminados: Array.from(gastosIdsToDelete),
+      },
+    });
     broadcastUpdate('corte_diario_deleted');
-    res.json({ ok: true });
+    res.json({ ok: true, cajaSesion: db.cajaSesion });
   } catch (err) {
     console.error('Error deleting corte diario:', err);
     res.status(500).json({ error: 'Error al eliminar el corte de caja.' });
@@ -753,7 +896,7 @@ app.post('/api/cortes', async (req, res) => {
       valesTotal: round2(lizzyVales + sandraVales),
       gastosTotal: round2(gastosTotal),
       lizzyTotal: round2(lizzyGross - lizzyVales),
-      sandraTotal: round2(sandraGross - sandraVales),
+      sandraTotal: round2(sandraGross - sandraVales - gastosTotal),
       efectivoTotal: round2(efectivoTotal),
       efectivoVales: round2(efectivoVales),
       efectivoGastos: round2(efectivoGastos),
@@ -771,6 +914,12 @@ app.post('/api/cortes', async (req, res) => {
     db.cortes.unshift(newCorte);
 
     await writeDb(db);
+    appendLog({
+      accion: 'REGISTRAR',
+      modulo: 'CORTE_QUINCENAL',
+      descripcion: `Cierre de corte quincenal "${newCorte.periodLabel}". Total bruto: Lps. ${newCorte.totalAmount.toFixed(2)} (Lizzy neto: Lps. ${newCorte.lizzyTotal.toFixed(2)}, Sandra neto: Lps. ${newCorte.sandraTotal.toFixed(2)}). ${newCorte.jobCount} servicios, ${newCorte.valeCount} vales, ${newCorte.gastoCount} gastos.`,
+      datos: newCorte,
+    });
     broadcastUpdate('corte_closed');
 
     res.status(201).json(newCorte);
@@ -873,11 +1022,11 @@ app.get('/api/export.csv', (req, res) => {
         'Gasto del salon',
         item.description,
         '',
-        'Salon general',
+        'Salon general (Deduce Sandra)',
         item.paymentMethod === 'efectivo' ? 'Efectivo' : 'Transferencia',
         -item.amount,
         0,
-        0,
+        -item.amount,
         estado,
       ]);
     }
@@ -915,11 +1064,12 @@ function getLocalIPv4Addresses() {
 }
 
 ensureDb();
+ensureLogs();
 createDailyBackup();
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log('\n==================================================');
-  console.log('  SISTEMA DE GESTION - SALON LIZZY & SANDRA');
+  console.log('  SISTEMA DE GESTION - DINORA BEAUTY NAILS');
   console.log('==================================================');
   console.log(`  En esta PC:      http://localhost:${PORT}`);
   const ips = getLocalIPv4Addresses();

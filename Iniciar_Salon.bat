@@ -1,9 +1,9 @@
 @echo off
-title Salon Lizzy y Sandra - Servidor Local
+title Dinora Beauty Nails - Servidor Local
 cd /d "%~dp0"
 
 echo ==================================================
-echo   Iniciando Sistema - Salon Lizzy ^& Sandra
+echo   Iniciando Sistema - Dinora Beauty Nails
 echo ==================================================
 echo.
 
@@ -19,6 +19,6 @@ if not exist "dist" (
 
 start "" cmd /c "timeout /t 2 /nobreak >nul & start http://localhost:3000"
 
-node server/index.js
+node --watch server/index.js
 pause
 

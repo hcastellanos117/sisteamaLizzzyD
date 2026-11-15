@@ -315,33 +315,35 @@ export default function DailySummary({
       const dayGastos = gastos.filter((g) => toLocalDateKey(g.createdAt) === dKey);
 
       if (dayCortes.length === 0) {
-        // Día sin cortes manuales registrados aún (turno en curso)
-        let total = 0, lizzy = 0, sandra = 0;
-        dayJobs.forEach((j) => {
-          total += j.amount;
-          lizzy += j.lizzyAmount;
-          sandra += j.sandraAmount;
-        });
-        const vTotal = dayVales.reduce((sum, v) => sum + v.amount, 0);
-        const gTotal = dayGastos.reduce((sum, g) => sum + g.amount, 0);
+        // Solo mostrar turno en curso si la caja está ABIERTA y hay movimientos activos
+        if (isCajaOpen && (dayJobs.length > 0 || dayVales.length > 0 || dayGastos.length > 0)) {
+          let total = 0, lizzy = 0, sandra = 0;
+          dayJobs.forEach((j) => {
+            total += j.amount;
+            lizzy += j.lizzyAmount;
+            sandra += j.sandraAmount;
+          });
+          const vTotal = dayVales.reduce((sum, v) => sum + v.amount, 0);
+          const gTotal = dayGastos.reduce((sum, g) => sum + g.amount, 0);
 
-        const sortedJobs = [...dayJobs].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-        const earliestTime = sortedJobs[0] ? sortedJobs[0].createdAt : null;
+          const sortedJobs = [...dayJobs].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+          const earliestTime = sortedJobs[0] ? sortedJobs[0].createdAt : null;
 
-        result.push({
-          type: 'day_summary',
-          key: `day_${dKey}`,
-          dateKey: dKey,
-          title: formatDateKeyLabel(dKey),
-          openedAt: earliestTime,
-          closedAt: null,
-          total,
-          lizzy,
-          sandra,
-          jobCount: dayJobs.length,
-          valesTotal: vTotal,
-          gastosTotal: gTotal,
-        });
+          result.push({
+            type: 'day_summary',
+            key: `day_${dKey}`,
+            dateKey: dKey,
+            title: formatDateKeyLabel(dKey),
+            openedAt: earliestTime,
+            closedAt: null,
+            total,
+            lizzy,
+            sandra,
+            jobCount: dayJobs.length,
+            valesTotal: vTotal,
+            gastosTotal: gTotal,
+          });
+        }
       } else {
         // Si hay cortes guardados en este día, agregar cada corte
         dayCortes.forEach((corte, idx) => {
@@ -366,7 +368,7 @@ export default function DailySummary({
         const lastCorte = dayCortes[dayCortes.length - 1];
         const openJobs = dayJobs.filter((j) => !j.corteDiarioId);
 
-        if (openJobs.length > 0) {
+        if (isCajaOpen && openJobs.length > 0) {
           let openTotal = 0, openLizzy = 0, openSandra = 0;
           openJobs.forEach((j) => {
             openTotal += j.amount;
@@ -393,7 +395,7 @@ export default function DailySummary({
     }
 
     return result;
-  }, [jobs, vales, gastos, cortesDiarios]);
+  }, [jobs, vales, gastos, cortesDiarios, isCajaOpen]);
 
   function handleRequestDeleteJob(id) {
     setSecurityModal({
@@ -411,6 +413,8 @@ export default function DailySummary({
       description: 'Ingresa la contraseña de administradora para eliminar este corte de caja guardado.',
       onConfirmAction: async (pwd) => {
         await onDeleteCorteDiario(id, pwd);
+        setManualCutOpen(false);
+        setJustSavedCut(false);
         if (selectedCorteModal && selectedCorteModal.id === id) {
           setSelectedCorteModal(null);
         }
@@ -473,7 +477,7 @@ export default function DailySummary({
     const periodTitle = formatDateKeyLabel(selectedDate);
 
     const lines = [
-      `*SALON LIZZY & SANDRA - CORTE DE CAJA*`,
+      `*DINORA BEAUTY NAILS - CORTE DE CAJA*`,
       `Fecha: ${periodTitle}`,
       `Trabajos realizados: ${filteredJobs.length}`,
       `------------------------------`,
@@ -732,20 +736,20 @@ export default function DailySummary({
       ) : (
         <>
           {/* Pestaña: Por día */}
-          <section className="rounded-2xl border border-[#565449]/60 bg-[#1A1B15] p-4 sm:p-5">
-            <div className="mb-4 flex items-center justify-between gap-2">
+          <section className="rounded-3xl border border-[#2D2A22] bg-[#161511] p-5 sm:p-7 shadow-lg space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-[#25231C]">
               <h2 className="flex items-center gap-2 text-base font-extrabold text-[#FFFBF4] sm:text-lg">
-                <Calendar className="h-4 w-4 text-[#D8CFBC]" aria-hidden="true" />
+                <Calendar className="h-4 w-4 text-[#E4C59E]" aria-hidden="true" />
                 {formatDateKeyLabel(selectedDate)}
               </h2>
-              <span className="shrink-0 rounded-xl border border-[#565449]/50 bg-[#11120D] px-3 py-1.5 text-xs font-semibold text-[#D8CFBC]">
-                {filteredJobs.length} {filteredJobs.length === 1 ? 'trabajo' : 'trabajos'}
+              <span className="rounded-full bg-[#25231C] px-3 py-1 text-xs font-semibold text-[#D8CFBC]">
+                {filteredJobs.length} {filteredJobs.length === 1 ? 'servicio' : 'servicios'}
               </span>
             </div>
 
             {/* Si la caja está cerrada, mostrar tarjeta limpia para aperturar caja */}
             {!isCajaOpen ? (
-              <div className="mb-3 rounded-2xl border border-amber-400/50 bg-[#11120D] p-5 text-center sm:p-7">
+              <div className="rounded-2xl border border-amber-400/40 bg-[#0E0E0A] p-5 text-center sm:p-7">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-300">
                   <Lock className="h-7 w-7" aria-hidden="true" />
                 </div>
@@ -828,95 +832,101 @@ export default function DailySummary({
               </div>
             ) : (
               <>
-                {/* Resumen principal del turno */}
-                <div className="mb-3 rounded-xl border border-[#565449]/50 bg-[#11120D] p-4">
-                  {filterType === 'day' && (
-                    <div className="mb-3 flex items-center justify-between border-b border-[#565449]/40 pb-2.5 text-xs">
-                      <span className="font-semibold text-[#D8CFBC]">Base inicial en caja</span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-extrabold text-[#FFFBF4]">{formatMoney(currentDayBase)}</span>
-                        <span className="inline-flex items-center gap-1 rounded-lg border border-[#565449]/60 bg-[#1A1B15] px-2 py-0.5 text-[11px] font-semibold text-[#9E9A8B]">
-                          <Lock className="h-3 w-3" aria-hidden="true" />
-                          Fijo del turno
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="text-center">
-                    <span className="text-xs font-semibold text-[#D8CFBC]">
+                {/* Hero Métricas del Turno (Sin tarjetas anidadas) */}
+                <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-4 pb-5 border-b border-[#25231C]">
+                  <div>
+                    <span className="text-xs font-bold uppercase tracking-wider text-[#A59F91]">
                       Total ingresado en servicios
                     </span>
-                    <div className="mt-1 text-4xl font-extrabold tracking-tight text-[#FFFBF4]">
+                    <div className="mt-1 text-4xl sm:text-5xl font-extrabold tracking-tight text-[#FFFBF4]">
                       {formatMoney(totals.total)}
                     </div>
                   </div>
+                  {filterType === 'day' && (
+                    <div className="flex items-center gap-3 text-xs text-[#A59F91] sm:text-right">
+                      <div>
+                        <span>Base de apertura: </span>
+                        <strong className="text-[#FFFBF4]">{formatMoney(currentDayBase)}</strong>
+                      </div>
+                      <span className="inline-flex items-center gap-1 rounded-md bg-[#25231C] px-2 py-0.5 text-[11px] text-[#A59F91]">
+                        <Lock className="h-3 w-3" aria-hidden="true" /> Fijo
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Colaboradoras */}
-                <div className="mb-3 grid grid-cols-2 gap-2.5">
-                  <div className="rounded-xl border border-[#565449]/50 bg-[#11120D] p-3.5">
-                    <div className="text-xs font-semibold text-[#D8CFBC]">Lizzy Dinora Viera</div>
-                    <div className="mt-1 text-2xl font-extrabold text-[#FFFBF4]">
+                {/* Colaboradoras: Columnas limpias sin anidación */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-5 border-b border-[#25231C]">
+                  <div className="rounded-2xl bg-[#1C181A] p-4 border border-[#E8B4B8]/20">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-[#E8B4B8]">
+                        Lizzy Dinora
+                      </span>
+                      <span className="h-2 w-2 rounded-full bg-[#E8B4B8]" aria-hidden="true" />
+                    </div>
+                    <div className="mt-2 text-2xl font-extrabold text-[#FFFBF4]">
                       {formatMoney(totals.lizzy)}
                     </div>
                     {totals.valesLizzy > 0 && (
-                      <div className="mt-1 text-xs font-semibold text-amber-300">
+                      <div className="mt-1 text-xs font-semibold text-[#E09F95]">
                         Vales: -{formatMoney(totals.valesLizzy)}
                       </div>
                     )}
                   </div>
-                  <div className="rounded-xl border border-[#565449]/50 bg-[#11120D] p-3.5">
-                    <div className="text-xs font-semibold text-[#D8CFBC]">Sandra Viera</div>
-                    <div className="mt-1 text-2xl font-extrabold text-[#FFFBF4]">
+
+                  <div className="rounded-2xl bg-[#162018] p-4 border border-[#A3C9A8]/20">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-[#A3C9A8]">
+                        Sandra Viera
+                      </span>
+                      <span className="h-2 w-2 rounded-full bg-[#A3C9A8]" aria-hidden="true" />
+                    </div>
+                    <div className="mt-2 text-2xl font-extrabold text-[#FFFBF4]">
                       {formatMoney(totals.sandra)}
                     </div>
                     {totals.valesSandra > 0 && (
-                      <div className="mt-1 text-xs font-semibold text-amber-300">
+                      <div className="mt-1 text-xs font-semibold text-[#E09F95]">
                         Vales: -{formatMoney(totals.valesSandra)}
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Efectivo vs Transferencias */}
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                  <div className="rounded-xl border border-[#565449]/50 bg-[#11120D] p-3.5">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 text-xs font-medium text-[#9E9A8B]">
-                        <Banknote className="h-4 w-4 text-[#D8CFBC]" aria-hidden="true" />
-                        Efectivo cobrado
-                      </span>
-                      <span className="text-sm font-bold text-[#FFFBF4]">
-                        {formatMoney(totals.efectivo)}
-                      </span>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between border-t border-[#565449]/40 pt-2 text-xs">
-                      <span className="font-bold text-[#D8CFBC]">Efectivo físico en caja:</span>
-                      <span className="text-base font-extrabold text-[#FFFBF4]">
-                        {formatMoney(efectivoEnCaja)}
-                      </span>
-                    </div>
+                {/* Flujo de cobros: Fila integrada */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-5 border-b border-[#25231C]">
+                  <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#0E0E0A] border border-[#25231C]">
+                    <span className="flex items-center gap-2 text-xs font-bold text-[#A59F91]">
+                      <Banknote className="h-4 w-4 text-[#A3C9A8]" aria-hidden="true" />
+                      Efectivo cobrado
+                    </span>
+                    <span className="text-sm font-extrabold text-[#FFFBF4]">
+                      {formatMoney(totals.efectivo)}
+                    </span>
                   </div>
 
-                  <div className="rounded-xl border border-[#565449]/50 bg-[#11120D] p-3.5">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 text-xs font-medium text-[#9E9A8B]">
-                        <CreditCard className="h-4 w-4 text-[#D8CFBC]" aria-hidden="true" />
-                        Transferencias
-                      </span>
-                      <span className="text-sm font-bold text-[#FFFBF4]">
-                        {formatMoney(totals.transferencia)}
-                      </span>
+                  <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#0E0E0A] border border-[#25231C]">
+                    <span className="flex items-center gap-2 text-xs font-bold text-[#A59F91]">
+                      <CreditCard className="h-4 w-4 text-[#9DBAD8]" aria-hidden="true" />
+                      Transferencias
+                    </span>
+                    <span className="text-sm font-extrabold text-[#FFFBF4]">
+                      {formatMoney(totals.transferencia)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Destacado: Efectivo físico esperado en gaveta */}
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-[#1E1B13] border border-[#E4C59E]/40">
+                  <div>
+                    <span className="text-xs font-bold uppercase tracking-wider text-[#E4C59E]">
+                      Efectivo en gaveta (Caja física)
+                    </span>
+                    <div className="text-[11px] text-[#A59F91]">
+                      Base inicial + Efectivo cobrado - Vales en efectivo
                     </div>
-                    {(totals.valesTransferencia > 0 || totals.gastosTransferencia > 0) && (
-                      <div className="mt-2 flex items-center justify-between border-t border-[#565449]/40 pt-2 text-xs text-amber-300">
-                        <span>Salidas por transf.:</span>
-                        <span className="font-bold">
-                          -{formatMoney(totals.valesTransferencia + totals.gastosTransferencia)}
-                        </span>
-                      </div>
-                    )}
+                  </div>
+                  <div className="text-2xl font-extrabold text-[#FFFBF4]">
+                    {formatMoney(efectivoEnCaja)}
                   </div>
                 </div>
 
@@ -924,9 +934,9 @@ export default function DailySummary({
             {(totalValesPeriodo > 0 || totals.gastosTotal > 0) && (
               <div className="mt-3 space-y-2">
                 {totalValesPeriodo > 0 && (
-                  <div className="flex items-center justify-between rounded-xl border border-amber-400/30 bg-amber-500/10 px-3.5 py-2 text-xs text-amber-200">
+                  <div className="flex items-center justify-between rounded-xl border border-[#E09F95]/30 bg-[#251717] px-3.5 py-2 text-xs text-[#E09F95]">
                     <span className="flex items-center gap-1.5 font-semibold">
-                      <ArrowDownCircle className="h-4 w-4" aria-hidden="true" />
+                      <ArrowDownCircle className="h-4 w-4 text-[#E09F95]" aria-hidden="true" />
                       Vales personales ({filteredVales.length})
                     </span>
                     <span className="font-extrabold">-{formatMoney(totalValesPeriodo)}</span>
@@ -1194,93 +1204,103 @@ export default function DailySummary({
       </section>
 
           {/* Trabajos registrados en la fecha / corte seleccionado */}
-          <section className="space-y-2.5">
-            <h3 className="text-sm font-bold text-[#D8CFBC]">
-              Trabajos registrados ({filteredJobs.length})
-            </h3>
+          <section className="rounded-3xl border border-[#2D2A22] bg-[#161511] overflow-hidden shadow-lg">
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[#25231C]">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#A59F91]">
+                Historial de servicios
+              </h3>
+              <span className="rounded-full bg-[#25231C] px-3 py-1 text-xs font-semibold text-[#D8CFBC]">
+                {filteredJobs.length} {filteredJobs.length === 1 ? 'servicio' : 'servicios'}
+              </span>
+            </div>
 
             {filteredJobs.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-[#565449]/60 bg-[#1A1B15]/50 px-4 py-10 text-center text-sm text-[#9E9A8B]">
-                No hay trabajos registrados en esta selección.
+              <div className="px-4 py-12 text-center text-sm text-[#7D786D]">
+                No hay servicios registrados en este turno.
               </div>
             ) : (
-              filteredJobs.map((job) => {
-                const workerInfo = WORKERS[job.worker] || WORKERS.lizzy;
+              <div className="divide-y divide-[#222019]">
+                {filteredJobs.map((job) => {
+                  const workerInfo = WORKERS[job.worker] || WORKERS.lizzy;
 
-                return (
-                  <div
-                    key={job.id}
-                    className="rounded-2xl border border-[#565449]/60 bg-[#1A1B15] p-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
+                  return (
+                    <div
+                      key={job.id}
+                      className="p-4 sm:p-5 transition hover:bg-[#1A1914] flex items-center justify-between gap-3"
+                    >
                       <div className="min-w-0 flex-1">
-                        <div className="text-base font-bold text-[#FFFBF4]">{job.description}</div>
-                        {job.clientReference && (
-                          <div className="mt-0.5 text-xs font-semibold text-[#D8CFBC]">
-                            Clienta / Ref: {job.clientReference}
-                          </div>
-                        )}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-base font-bold text-[#FFFBF4]">{job.description}</span>
+                          {job.clientReference && (
+                            <span className="text-xs text-[#E4C59E] font-medium">
+                              • {job.clientReference}
+                            </span>
+                          )}
+                        </div>
                         <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
                           <span
                             className={`rounded-lg border px-2 py-0.5 font-semibold ${workerInfo.badgeClass}`}
                           >
                             {workerInfo.shortName}
                           </span>
-                          <span className="inline-flex items-center gap-1 rounded-lg border border-[#565449]/50 bg-[#11120D] px-2 py-0.5 text-[#D8CFBC]">
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-[#222019] px-2 py-0.5 text-[#D8CFBC]">
                             {job.paymentMethod === 'efectivo' ? (
-                              <Banknote className="h-3 w-3" aria-hidden="true" />
+                              <Banknote className="h-3 w-3 text-[#A3C9A8]" aria-hidden="true" />
                             ) : (
-                              <CreditCard className="h-3 w-3" aria-hidden="true" />
+                              <CreditCard className="h-3 w-3 text-[#9DBAD8]" aria-hidden="true" />
                             )}
                             {job.paymentMethod === 'efectivo' ? 'Efectivo' : 'Transferencia'}
                           </span>
-                          <span className="text-[#9E9A8B]">
+                          <span className="text-[#7D786D]">
                             {filterType === 'day'
                               ? formatTime(job.createdAt)
                               : formatDateTime(job.createdAt)}
                           </span>
                         </div>
                         {job.worker === 'both' && (
-                          <div className="mt-1.5 text-xs text-[#D8CFBC]">
-                            Lizzy: {formatMoney(job.lizzyAmount)} • Sandra:{' '}
-                            {formatMoney(job.sandraAmount)}
+                          <div className="mt-1.5 text-xs text-[#7D786D]">
+                            Lizzy: <span className="text-[#E8B4B8] font-bold">{formatMoney(job.lizzyAmount)}</span> • Sandra:{' '}
+                            <span className="text-[#A3C9A8] font-bold">{formatMoney(job.sandraAmount)}</span>
                           </div>
                         )}
                       </div>
 
-                      <div className="text-right">
-                        <div className="text-xl font-extrabold text-[#FFFBF4]">
-                          {formatMoney(job.amount)}
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <div className="text-lg sm:text-xl font-extrabold text-[#FFFBF4]">
+                            {formatMoney(job.amount)}
+                          </div>
+                          {job.corteId && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#7D786D]">
+                              <Lock className="h-3 w-3" aria-hidden="true" /> Cerrado
+                            </span>
+                          )}
                         </div>
-                        {job.corteId ? (
-                          <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-[#9E9A8B]">
-                            <Lock className="h-3 w-3" aria-hidden="true" /> Cerrado
-                          </span>
-                        ) : (
-                          <div className="mt-2 flex items-center justify-end gap-1.5">
+                        {!job.corteId && (
+                          <div className="flex items-center gap-1">
                             <button
                               type="button"
                               onClick={() => setEditingJob(job)}
                               aria-label="Corregir trabajo"
-                              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-[#565449] bg-[#11120D] text-[#D8CFBC] hover:text-[#FFFBF4] active:scale-95"
+                              className="inline-flex min-h-[38px] min-w-[38px] items-center justify-center rounded-xl bg-[#222019] text-[#D8CFBC] hover:text-[#FFFBF4] active:scale-95"
                             >
-                              <Pencil className="h-4 w-4" aria-hidden="true" />
+                              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                             </button>
                             <button
                               type="button"
                               onClick={() => handleRequestDeleteJob(job.id)}
                               aria-label="Eliminar trabajo"
-                              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-[#565449] bg-[#11120D] text-[#9E9A8B] transition active:scale-95 hover:text-red-400"
+                              className="inline-flex min-h-[38px] min-w-[38px] items-center justify-center rounded-xl bg-[#222019] text-[#8E897C] transition active:scale-95 hover:text-red-400"
                             >
-                              <Trash2 className="h-4 w-4" aria-hidden="true" />
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                             </button>
                           </div>
                         )}
                       </div>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+              </div>
             )}
           </section>
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Banknote, CreditCard, KeyRound, X } from 'lucide-react';
 import { isValidAdminPassword } from '../utils/security';
 
@@ -24,13 +25,20 @@ export default function EditJobModal({ job, onClose, onSave }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
     function handleKeyDown(e) {
       if (e.key === 'Escape') {
         onClose();
       }
     }
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [onClose]);
 
   async function handleSubmit(e) {
@@ -75,14 +83,20 @@ export default function EditJobModal({ job, onClose, onSave }) {
     }
   }
 
-  return (
+  const modalNode = (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="edit-job-title"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overscroll-contain overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      <div className="w-full max-w-lg rounded-t-3xl border border-[#565449] bg-[#1A1B15] p-5 shadow-2xl sm:rounded-3xl sm:p-6">
+      <div
+        className="relative my-auto w-full max-w-lg rounded-3xl border border-[#2B2921] bg-[#161511] p-5 shadow-2xl sm:p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="mb-4 flex items-center justify-between">
           <h3 id="edit-job-title" className="text-lg font-bold text-[#FFFBF4]">
             Corregir trabajo
@@ -91,7 +105,7 @@ export default function EditJobModal({ job, onClose, onSave }) {
             type="button"
             aria-label="Cerrar ventana"
             onClick={onClose}
-            className="rounded-xl border border-[#565449]/60 bg-[#11120D] p-2.5 text-[#D8CFBC] hover:text-[#FFFBF4]"
+            className="rounded-xl border border-[#26241D] bg-[#11100D] p-2.5 text-[#8E897C] hover:border-[#E4C59E]/40 hover:text-[#FFFBF4] transition"
           >
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
@@ -241,14 +255,14 @@ export default function EditJobModal({ job, onClose, onSave }) {
             <button
               type="button"
               onClick={onClose}
-              className="min-h-[46px] flex-1 rounded-xl border border-[#565449] bg-[#11120D] py-3 text-base font-semibold text-[#D8CFBC]"
+              className="min-h-[46px] flex-1 rounded-2xl border border-[#26241D] bg-[#11100D] py-3 text-sm font-bold text-[#A59F91] hover:border-[#38362D] hover:text-[#FFFBF4] transition active:scale-95"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="min-h-[46px] flex-1 rounded-xl bg-[#FFFBF4] py-3 text-base font-bold text-[#11120D] disabled:opacity-50"
+              className="min-h-[46px] flex-1 rounded-2xl bg-[#FFFBF4] py-3 text-sm font-extrabold text-[#11100D] hover:bg-[#E5DFD3] transition active:scale-95 disabled:opacity-50"
             >
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
@@ -257,4 +271,6 @@ export default function EditJobModal({ job, onClose, onSave }) {
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalNode, document.body) : modalNode;
 }
